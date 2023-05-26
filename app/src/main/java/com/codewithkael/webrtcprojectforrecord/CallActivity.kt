@@ -1,10 +1,10 @@
 package com.codewithkael.webrtcprojectforrecord
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import com.codewithkael.webrtcprojectforrecord.databinding.ActivityCallBinding
 import com.codewithkael.webrtcprojectforrecord.models.IceCandidateModel
 import com.codewithkael.webrtcprojectforrecord.models.MessageModel
@@ -19,12 +19,12 @@ import org.webrtc.SessionDescription
 class CallActivity : AppCompatActivity(), NewMessageInterface {
 
 
-    lateinit var binding : ActivityCallBinding
-    private var userName:String?=null
-    private var socketRepository:SocketRepository?=null
-    private var rtcClient : RTCClient?=null
+    lateinit var binding: ActivityCallBinding
+    private var userName: String? = null
+    private var socketRepository: SocketRepository? = null
+    private var rtcClient: RTCClient? = null
     private val TAG = "CallActivity"
-    private var target:String = ""
+    private var target: String = ""
     private val gson = Gson()
     private var isMute = false
     private var isCameraPause = false
@@ -41,11 +41,11 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
 
     }
 
-    private fun init(){
+    private fun init() {
         userName = intent.getStringExtra("username")
         socketRepository = SocketRepository(this)
         userName?.let { socketRepository?.initSocket(it) }
-        rtcClient = RTCClient(application,userName!!,socketRepository!!, object : PeerConnectionObserver() {
+        rtcClient = RTCClient(application, userName!!, socketRepository!!, object : PeerConnectionObserver() {
             override fun onIceCandidate(p0: IceCandidate?) {
                 super.onIceCandidate(p0)
                 rtcClient?.addIceCandidate(p0)
@@ -56,7 +56,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                 )
 
                 socketRepository?.sendMessageToSocket(
-                    MessageModel("ice_candidate",userName,target,candidate)
+                    MessageModel("ice_candidate", userName, target, candidate)
                 )
 
             }
@@ -74,7 +74,7 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
         binding.apply {
             callBtn.setOnClickListener {
                 socketRepository?.sendMessageToSocket(MessageModel(
-                    "start_call",userName,targetUserNameEt.text.toString(),null
+                    "start_call", userName, targetUserNameEt.text.toString(), null
                 ))
                 target = targetUserNameEt.text.toString()
             }
@@ -84,10 +84,10 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
             }
 
             micButton.setOnClickListener {
-                if (isMute){
+                if (isMute) {
                     isMute = false
                     micButton.setImageResource(R.drawable.ic_baseline_mic_off_24)
-                }else{
+                } else {
                     isMute = true
                     micButton.setImageResource(R.drawable.ic_baseline_mic_24)
                 }
@@ -95,10 +95,10 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
             }
 
             videoButton.setOnClickListener {
-                if (isCameraPause){
+                if (isCameraPause) {
                     isCameraPause = false
                     videoButton.setImageResource(R.drawable.ic_baseline_videocam_off_24)
-                }else{
+                } else {
                     isCameraPause = true
                     videoButton.setImageResource(R.drawable.ic_baseline_videocam_24)
                 }
@@ -106,11 +106,11 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
             }
 
             audioOutputButton.setOnClickListener {
-                if (isSpeakerMode){
+                if (isSpeakerMode) {
                     isSpeakerMode = false
                     audioOutputButton.setImageResource(R.drawable.ic_baseline_hearing_24)
                     rtcAudioManager.setDefaultAudioDevice(RTCAudioManager.AudioDevice.EARPIECE)
-                }else{
+                } else {
                     isSpeakerMode = true
                     audioOutputButton.setImageResource(R.drawable.ic_baseline_speaker_up_24)
                     rtcAudioManager.setDefaultAudioDevice(RTCAudioManager.AudioDevice.SPEAKER_PHONE)
@@ -130,15 +130,14 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
 
     override fun onNewMessage(message: MessageModel) {
         Log.d(TAG, "onNewMessage: $message")
-        when(message.type){
-            "call_response"->{
-                if (message.data == "user is not online"){
+        when (message.type) {
+            "call_response" -> {
+                if (message.data == "user is not online") {
                     //user is not reachable
                     runOnUiThread {
-                        Toast.makeText(this,"user is not reachable",Toast.LENGTH_LONG).show()
-
+                        Toast.makeText(this, "user is not reachable", Toast.LENGTH_LONG).show()
                     }
-                }else{
+                } else {
                     //we are ready for call, we started a call
                     runOnUiThread {
                         setWhoToCallLayoutGone()
@@ -149,27 +148,15 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                             rtcClient?.startLocalVideo(localView)
                             rtcClient?.call(targetUserNameEt.text.toString())
                         }
-
-
                     }
-
                 }
             }
-            "answer_received" ->{
 
-                val session = SessionDescription(
-                    SessionDescription.Type.ANSWER,
-                    message.data.toString()
-                )
-                rtcClient?.onRemoteSessionReceived(session)
-                runOnUiThread {
-                    binding.remoteViewLoading.visibility = View.GONE
-                }
-            }
-            "offer_received" ->{
+            "offer_received" -> {
                 runOnUiThread {
                     setIncomingCallLayoutVisible()
                     binding.incomingNameTV.text = "${message.name.toString()} is calling you"
+
                     binding.acceptButton.setOnClickListener {
                         setIncomingCallLayoutGone()
                         setCallLayoutVisible()
@@ -180,10 +167,8 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                             rtcClient?.initializeSurfaceView(remoteView)
                             rtcClient?.startLocalVideo(localView)
                         }
-                        val session = SessionDescription(
-                            SessionDescription.Type.OFFER,
-                            message.data.toString()
-                        )
+                        val session = SessionDescription(SessionDescription.Type.OFFER, message.data.toString())
+                        Log.d(TAG, "onNewMessage  offer_received ccc: ${message.data}")
                         rtcClient?.onRemoteSessionReceived(session)
                         rtcClient?.answer(message.name!!)
                         target = message.name!!
@@ -193,28 +178,38 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
                     binding.rejectButton.setOnClickListener {
                         setIncomingCallLayoutGone()
                     }
-
                 }
-
             }
 
+            "answer_received" -> {
 
-            "ice_candidate"->{
+                val session = SessionDescription(
+                    SessionDescription.Type.ANSWER,
+                    message.data.toString()
+                )
+                rtcClient?.onRemoteSessionReceived(session)
+                runOnUiThread {
+                    binding.remoteViewLoading.visibility = View.GONE
+                }
+            }
+
+            "ice_candidate" -> {
                 try {
                     val receivingCandidate = gson.fromJson(gson.toJson(message.data),
                         IceCandidateModel::class.java)
                     rtcClient?.addIceCandidate(IceCandidate(receivingCandidate.sdpMid,
-                        Math.toIntExact(receivingCandidate.sdpMLineIndex.toLong()),receivingCandidate.sdpCandidate))
-                }catch (e:Exception){
+                        Math.toIntExact(receivingCandidate.sdpMLineIndex.toLong()), receivingCandidate.sdpCandidate))
+                } catch (e: Exception) {
                     e.printStackTrace()
                 }
             }
         }
     }
 
-    private fun setIncomingCallLayoutGone(){
+    private fun setIncomingCallLayoutGone() {
         binding.incomingCallLayout.visibility = View.GONE
     }
+
     private fun setIncomingCallLayoutVisible() {
         binding.incomingCallLayout.visibility = View.VISIBLE
     }
