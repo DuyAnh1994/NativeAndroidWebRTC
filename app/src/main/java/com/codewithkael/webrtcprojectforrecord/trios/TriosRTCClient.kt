@@ -127,7 +127,7 @@ class TriosRTCClient(
 
         val sdpObserver = object : SdpObserverImpl() {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                setLocalDesc(desc, "a")
+                setLocalDesc(desc, target)
             }
         }
 
@@ -138,9 +138,6 @@ class TriosRTCClient(
         val sdpObserver = object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
             override fun onSetSuccess() {
-//                val offer = hashMapOf("sdp" to desc?.description, "type" to desc?.type)
-
-
                 val dataDto = DataDto(
                     name = target,
                     sdp = desc?.description

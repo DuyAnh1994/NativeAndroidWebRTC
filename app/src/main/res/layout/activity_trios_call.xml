@@ -53,6 +53,7 @@
             android:layout_width="match_parent"
             android:layout_height="40dp"
             android:layout_margin="30dp"
+            android:text="a"
             android:hint="who to call ?" />
 
         <androidx.appcompat.widget.AppCompatButton
