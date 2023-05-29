@@ -1,8 +1,11 @@
 package com.codewithkael.webrtcprojectforrecord.trios
 
 import android.app.Application
-import com.codewithkael.webrtcprojectforrecord.trios.model.DataDto
-import com.codewithkael.webrtcprojectforrecord.trios.model.RtcDto
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.DataDtoRequest
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRequest
 import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
 import org.webrtc.CameraVideoCapturer
@@ -26,15 +29,11 @@ class TriosRTCClient(
     private val observer: PeerConnection.Observer
 ) {
 
-    private companion object {
+    companion object {
         private const val TAG = "TriosRTCClient"
         private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
         private const val USERNAME = "bgldemo"
         private const val PASSWORD = "bgltest"
-    }
-
-    init {
-        initPeerConnectionFactory(application)
     }
 
     private val eglContext = EglBase.create()
@@ -51,6 +50,30 @@ class TriosRTCClient(
     private var videoCapturer: CameraVideoCapturer? = null
     private var localAudioTrack: AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
+
+    private val mediaConstraints = MediaConstraints().apply {
+        mandatory?.add(MediaConstraints.KeyValuePair(  "OfferToReceiveAudio", "true"))
+        optional?.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+
+        mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
+        optional.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
+
+        mandatory.add(MediaConstraints.KeyValuePair("levelControl", "true"))
+        optional.add(MediaConstraints.KeyValuePair("levelControl", "true"))
+
+        optional?.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+        mandatory?.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+
+        mandatory.add( MediaConstraints.KeyValuePair("maxHeight", Integer.toString(1920)));
+        mandatory.add( MediaConstraints.KeyValuePair("maxWidth", Integer.toString(1080)));
+        mandatory.add( MediaConstraints.KeyValuePair("maxFrameRate", Integer.toString(60)));
+        mandatory.add( MediaConstraints.KeyValuePair("minFrameRate", Integer.toString(1)))
+    }
+
+
+    init {
+        initPeerConnectionFactory(application)
+    }
 
 
     private fun initPeerConnectionFactory(application: Application) {
@@ -97,20 +120,25 @@ class TriosRTCClient(
     }
 
     fun startLocalVideo(surface: SurfaceViewRenderer) {
-        val surfaceTextureHelper = SurfaceTextureHelper.create(Thread.currentThread().name, eglContext.eglBaseContext)
-        videoCapturer = getVideoCapturer(application)
-        videoCapturer?.initialize(surfaceTextureHelper, surface.context, localVideoSource.capturerObserver)
-        videoCapturer?.startCapture(1920, 1080, 60)
+        try {
+            val surfaceTextureHelper = SurfaceTextureHelper.create(Thread.currentThread().name, eglContext.eglBaseContext)
+            videoCapturer = getVideoCapturer(application)
+            videoCapturer?.initialize(surfaceTextureHelper, surface.context, localVideoSource.capturerObserver)
+            videoCapturer?.startCapture(1920, 1080, 60)
 
-        localVideoTrack = peerConnectionFactory.createVideoTrack("local_track", localVideoSource)
-        localVideoTrack?.addSink(surface)
-        localAudioTrack = peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
+            localVideoTrack = peerConnectionFactory.createVideoTrack("local_track", localVideoSource)
+            localVideoTrack?.addSink(surface)
+            localAudioTrack = peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
 
-        val localStream = peerConnectionFactory.createLocalMediaStream("local_stream")
-        localStream.addTrack(localAudioTrack)
-        localStream.addTrack(localVideoTrack)
+            val localStream = peerConnectionFactory.createLocalMediaStream("local_stream")
+            localStream.addTrack(localAudioTrack)
+            localStream.addTrack(localVideoTrack)
 
-        peerConnection?.addStream(localStream)
+
+//            peerConnection?.addStream(localStream) // TODO: crash
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun getVideoCapturer(application: Application): CameraVideoCapturer {
@@ -122,46 +150,41 @@ class TriosRTCClient(
     }
 
     fun call(target: String? = null) {
-        val mediaConstraints = MediaConstraints()
-        mediaConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
 
-        val sdpObserver = object : SdpObserverImpl() {
+        val sdpObserverByCreate = object : SdpObserverImpl() {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                setLocalDesc(desc, target)
+                val sdpObserver = object : SdpObserver {
+                    override fun onCreateSuccess(p0: SessionDescription?) {}
+                    override fun onSetSuccess() {
+
+                        val dataDto = DataDtoRequest(
+                            name = target,
+                            sdp = desc?.description
+                        )
+
+                        val rtcDto = RtcDtoRequest(
+                            type = "cmd",
+                            transId = 0,
+                            name = "join",
+                            dataDto = dataDto
+                        )
+
+                        // send socket cmd create offer
+                        socket.sendMessageToSocket(rtcDto)
+                    }
+
+                    override fun onCreateFailure(p0: String?) {}
+                    override fun onSetFailure(p0: String?) {}
+                }
+
+                peerConnection?.setLocalDescription(sdpObserver, desc)
             }
         }
 
-        peerConnection?.createOffer(sdpObserver, mediaConstraints)
+        peerConnection?.createOffer(sdpObserverByCreate, mediaConstraints)
     }
 
-    fun setLocalDesc(desc: SessionDescription?, target: String?) {
-        val sdpObserver = object : SdpObserver {
-            override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onSetSuccess() {
-                val dataDto = DataDto(
-                    name = target,
-                    sdp = desc?.description
-                )
-
-                val rtcDto = RtcDto(
-                    type = "cmd",
-                    transId = 0,
-                    name = "join",
-                    dataDto = dataDto
-                )
-
-                // send socket cmd create offer
-                socket.sendMessageToSocket(rtcDto)
-            }
-
-            override fun onCreateFailure(p0: String?) {}
-            override fun onSetFailure(p0: String?) {}
-        }
-
-        peerConnection?.setLocalDescription(sdpObserver, desc)
-    }
-
-    fun onRemoteSessionReceived(session: SessionDescription) {
+    fun setRemoteDesc(session: SessionDescription) {
         val sdpObserver = object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
             override fun onSetSuccess() {}
@@ -173,20 +196,28 @@ class TriosRTCClient(
     }
 
     fun answer(target: String? = null) {
-        val constraints = MediaConstraints()
-        constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
-
         val sdpObserver = object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
+                Log.d(TAG, "answer: 3")
                 setLocalDesc(desc)
             }
 
             override fun onSetSuccess() {}
-            override fun onCreateFailure(p0: String?) {}
+            override fun onCreateFailure(p0: String?) {
+                Log.d(TAG, "onCreateFailure() called with: p0 = $p0")
+            }
+
             override fun onSetFailure(p0: String?) {}
         }
 
-        peerConnection?.createAnswer(sdpObserver, constraints)
+//        Log.d(TAG, "answer signalingState: ${peerConnection?.signalingState()}")
+
+            peerConnection?.createAnswer(sdpObserver, mediaConstraints)
+
+//        Handler(Looper.getMainLooper()).postDelayed({
+//            peerConnection?.createAnswer(sdpObserver, mediaConstraints)
+//        }, 2000)
+
     }
 
     private fun setLocalDesc(desc: SessionDescription?) {
@@ -197,6 +228,8 @@ class TriosRTCClient(
 
                 // send socket cmd create answer
 //                        socket.sendMessageToSocket("")
+
+                Log.d(TAG, "onSetSuccess() called ccccccccccccccccccccccccccc")
             }
 
             override fun onCreateFailure(p0: String?) {}

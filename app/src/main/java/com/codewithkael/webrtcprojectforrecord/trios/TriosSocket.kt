@@ -1,7 +1,10 @@
 package com.codewithkael.webrtcprojectforrecord.trios
 
 import android.util.Log
-import com.codewithkael.webrtcprojectforrecord.trios.model.RtcDto
+import com.codewithkael.webrtcprojectforrecord.trios.model.base.RtcBaseResponse
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRequest
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.response.RtcDtoResponse
+import com.codewithkael.webrtcprojectforrecord.trios.model.event.response.EventDtoResponse
 import com.google.gson.Gson
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
@@ -12,7 +15,7 @@ class TriosSocket(private val listener: TriosSocketListener) {
 
     companion object {
         private const val TAG = "TriosSocket"
-        private const val WS_URL = "wss://dev.turn2.gtrios.io:8084/?id=bGlobal"
+        private const val WS_URL = "wss://dev.turn2.gtrios.io:8084/?id=1"
     }
 
     private var webSocket: WebSocketClient? = null
@@ -26,7 +29,11 @@ class TriosSocket(private val listener: TriosSocketListener) {
 
             override fun onMessage(message: String?) {
                 Log.d(TAG, "onMessage raw data: $message")
-                listener.onMessage(gson.fromJson(message, RtcDto::class.java))
+                val baseResponse = gson.fromJson(message, RtcBaseResponse::class.java)
+                when (baseResponse.type) {
+                    "response" -> listener.onRtcResponse(gson.fromJson(message, RtcDtoResponse::class.java))
+                    "event" -> listener.onRtcEvent(gson.fromJson(message, EventDtoResponse::class.java))
+                }
             }
 
             override fun onClose(code: Int, reason: String?, remote: Boolean) {
@@ -42,7 +49,7 @@ class TriosSocket(private val listener: TriosSocketListener) {
         webSocket?.connect()
     }
 
-    fun sendMessageToSocket(rtcDto: RtcDto) {
+    fun sendMessageToSocket(rtcDto: RtcDtoRequest) {
         try {
             val json = gson.toJson(rtcDto)
             Log.d(TAG, "send json: $json")

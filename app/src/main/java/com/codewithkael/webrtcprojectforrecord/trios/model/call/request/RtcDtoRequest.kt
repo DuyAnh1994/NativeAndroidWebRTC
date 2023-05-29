@@ -1,13 +1,13 @@
-package com.codewithkael.webrtcprojectforrecord.trios.model
+package com.codewithkael.webrtcprojectforrecord.trios.model.call.request
 
 import com.google.gson.annotations.SerializedName
 
-data class RtcDto(
+data class RtcDtoRequest(
     @SerializedName("type") var type: String? = null,
 
     @SerializedName("transId") var transId: Int? = null,
 
     @SerializedName("name") var name: String? = null,
 
-    @SerializedName("data") var dataDto: DataDto? = null
+    @SerializedName("data") var dataDto: DataDtoRequest? = null
 )
