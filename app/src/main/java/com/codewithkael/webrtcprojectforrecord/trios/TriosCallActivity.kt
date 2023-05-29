@@ -10,7 +10,11 @@ import com.codewithkael.webrtcprojectforrecord.utils.PeerConnectionObserver
 import com.codewithkael.webrtcprojectforrecord.utils.RTCAudioManager
 import com.codewithkael.webrtcprojectforrecord.utils.gone
 import com.codewithkael.webrtcprojectforrecord.utils.show
+import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
+import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
+import org.webrtc.RtpReceiver
 import org.webrtc.SessionDescription
 
 class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
@@ -23,9 +27,50 @@ class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
     private var socketClient: TriosSocket? = null
     private var rtcClient: TriosRTCClient? = null
     private var peerConnectionObserver: PeerConnectionObserver? = object : PeerConnectionObserver() {
+        override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
+            Log.d(TAG, "onSignalingChange() called with: p0 = ${p0?.name}")
+        }
+
+        override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
+            Log.d(TAG, "onIceConnectionChange() called with: p0 = ${p0?.name}")
+        }
+
+        override fun onIceConnectionReceivingChange(p0: Boolean) {
+            Log.d(TAG, "onIceConnectionReceivingChange() called with: p0 = $p0")
+        }
+
+        override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {
+            Log.d(TAG, "onIceGatheringChange: ${p0?.name}")
+
+        }
+
         override fun onIceCandidate(p0: IceCandidate?) {
-            super.onIceCandidate(p0)
+            Log.d(TAG, "onIceCandidate: ${p0?.sdpMid}")
             rtcClient?.addIceCandidate(p0)
+        }
+
+        override fun onIceCandidatesRemoved(p0: Array<out IceCandidate>?) {
+            Log.d(TAG, "onIceCandidatesRemoved() called with: p0 = $p0")
+        }
+
+        override fun onAddStream(p0: MediaStream?) {
+            Log.d(TAG, "onAddStream() called with: p0 = $p0")
+        }
+
+        override fun onRemoveStream(p0: MediaStream?) {
+            Log.d(TAG, "onRemoveStream() called with: p0 = $p0")
+        }
+
+        override fun onDataChannel(p0: DataChannel?) {
+            Log.d(TAG, "onDataChannel() called with: p0 = $p0")
+        }
+
+        override fun onRenegotiationNeeded() {
+            Log.d(TAG, "onRenegotiationNeeded() called")
+        }
+
+        override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {
+            Log.d(TAG, "onAddTrack() called with: p0 = $p0, p1 = $p1")
         }
     }
     private val rtcAudioManager by lazy { RTCAudioManager.create(this) }
@@ -66,24 +111,20 @@ class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
                 rtcClient?.initializeSurfaceView(localView)
                 rtcClient?.initializeSurfaceView(remoteView)
                 rtcClient?.startLocalVideo(localView)
+//                rtcClient?.createDataChannel("room 1")
                 rtcClient?.call(targetUserNameEt.text.toString())
             }
         }
     }
 
     private fun offerResponse(sdp: String?) {
+        Log.d(TAG, "offerResponse: ccccccccc")
         runOnUiThread {
-            setIncomingCallLayoutVisible()
-            binding.incomingNameTV.text = "... is calling you"
-
-            setIncomingCallLayoutGone()
-            setCallLayoutVisible()
-            setWhoToCallLayoutGone()
-
             val session = SessionDescription(SessionDescription.Type.OFFER, sdp)
             rtcClient?.setRemoteDesc(session)
-            rtcClient?.answer()
-            hideLoading()
+            rtcClient?.answer() {
+                hideLoading()
+            }
         }
     }
 

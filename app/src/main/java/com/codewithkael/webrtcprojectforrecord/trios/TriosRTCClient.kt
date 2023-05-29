@@ -9,6 +9,7 @@ import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRe
 import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
 import org.webrtc.CameraVideoCapturer
+import org.webrtc.DataChannel
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
@@ -51,8 +52,11 @@ class TriosRTCClient(
     private var localAudioTrack: AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
 
+    private var dataChannel: DataChannel? = null
+
+
     private val mediaConstraints = MediaConstraints().apply {
-        mandatory?.add(MediaConstraints.KeyValuePair(  "OfferToReceiveAudio", "true"))
+        mandatory?.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
         optional?.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
 
         mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
@@ -64,10 +68,10 @@ class TriosRTCClient(
         optional?.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
         mandatory?.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
 
-        mandatory.add( MediaConstraints.KeyValuePair("maxHeight", Integer.toString(1920)));
-        mandatory.add( MediaConstraints.KeyValuePair("maxWidth", Integer.toString(1080)));
-        mandatory.add( MediaConstraints.KeyValuePair("maxFrameRate", Integer.toString(60)));
-        mandatory.add( MediaConstraints.KeyValuePair("minFrameRate", Integer.toString(1)))
+        mandatory.add(MediaConstraints.KeyValuePair("maxHeight", Integer.toString(1920)));
+        mandatory.add(MediaConstraints.KeyValuePair("maxWidth", Integer.toString(1080)));
+        mandatory.add(MediaConstraints.KeyValuePair("maxFrameRate", Integer.toString(60)));
+        mandatory.add(MediaConstraints.KeyValuePair("minFrameRate", Integer.toString(1)))
     }
 
 
@@ -108,6 +112,7 @@ class TriosRTCClient(
             iceBackupCandidatePairPingInterval = 1000
             candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
         }
+
         return peerConnectionFactory.createPeerConnection(rtcConfiguration, observer)
     }
 
@@ -135,10 +140,29 @@ class TriosRTCClient(
             localStream.addTrack(localVideoTrack)
 
 
-//            peerConnection?.addStream(localStream) // TODO: crash
+//            peerConnection?.addStream(localStream) // TODO: crash nếu create instance peer connection with RTCConfiguration
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun createDataChannel(room: String) {
+        val observer = object : DataChannel.Observer {
+            override fun onBufferedAmountChange(p0: Long) {
+                Log.d(TAG, "onBufferedAmountChange() called with: p0 = $p0")
+            }
+
+            override fun onStateChange() {
+                Log.d(TAG, "onStateChange() called")
+            }
+
+            override fun onMessage(p0: DataChannel.Buffer?) {
+                Log.d(TAG, "onMessage() called with: p0 = $p0")
+            }
+        }
+
+        dataChannel = peerConnection?.createDataChannel(room, DataChannel.Init())
+        dataChannel?.registerObserver(observer)
     }
 
     private fun getVideoCapturer(application: Application): CameraVideoCapturer {
@@ -185,6 +209,7 @@ class TriosRTCClient(
     }
 
     fun setRemoteDesc(session: SessionDescription) {
+        Log.d(TAG, "setRemoteDesc: 1")
         val sdpObserver = object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
             override fun onSetSuccess() {}
@@ -195,29 +220,29 @@ class TriosRTCClient(
         peerConnection?.setRemoteDescription(sdpObserver, session)
     }
 
-    fun answer(target: String? = null) {
+    fun answer(target: String? = null, onSuccess: () -> Unit={}) {
         val sdpObserver = object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                Log.d(TAG, "answer: 3")
+                Log.d(TAG, "onCreateSuccess() called with: desc = $desc")
                 setLocalDesc(desc)
+                onSuccess.invoke()
             }
 
-            override fun onSetSuccess() {}
+            override fun onSetSuccess() {
+                Log.d(TAG, "onSetSuccess() called")
+            }
             override fun onCreateFailure(p0: String?) {
                 Log.d(TAG, "onCreateFailure() called with: p0 = $p0")
             }
 
-            override fun onSetFailure(p0: String?) {}
+            override fun onSetFailure(p0: String?) {
+                Log.d(TAG, "onSetFailure() called with: p0 = $p0")
+            }
         }
 
-//        Log.d(TAG, "answer signalingState: ${peerConnection?.signalingState()}")
+        Log.d(TAG, "answer signalingState: ${peerConnection?.signalingState()}")
 
-            peerConnection?.createAnswer(sdpObserver, mediaConstraints)
-
-//        Handler(Looper.getMainLooper()).postDelayed({
-//            peerConnection?.createAnswer(sdpObserver, mediaConstraints)
-//        }, 2000)
-
+        peerConnection?.createAnswer(sdpObserver, mediaConstraints)
     }
 
     private fun setLocalDesc(desc: SessionDescription?) {
