@@ -32,7 +32,8 @@ class TriosRTCClient(
 
     companion object {
         private const val TAG = "TriosRTCClient"
-        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
+        private const val RTC_URL = "turn:turn-dev01.gtrios.io:3478"
+//        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
         private const val USERNAME = "bgldemo"
         private const val PASSWORD = "bgltest"
     }
