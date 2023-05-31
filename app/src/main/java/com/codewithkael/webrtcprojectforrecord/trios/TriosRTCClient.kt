@@ -1,8 +1,6 @@
 package com.codewithkael.webrtcprojectforrecord.trios
 
 import android.app.Application
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.DataDtoRequest
 import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRequest
@@ -32,20 +30,16 @@ class TriosRTCClient(
 
     companion object {
         private const val TAG = "TriosRTCClient"
-        private const val RTC_URL = "turn:turn-dev01.gtrios.io:3478"
-//        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
+
+        //        private const val RTC_URL = "turn:turn-dev01.gtrios.io:3478"
+        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
         private const val USERNAME = "bgldemo"
         private const val PASSWORD = "bgltest"
     }
 
     private val eglContext = EglBase.create()
     private val peerConnectionFactory by lazy { createPeerConnectionFactory() }
-    private val iceServer = listOf(
-        PeerConnection.IceServer.builder(RTC_URL)
-            .setUsername(USERNAME)
-            .setPassword(PASSWORD)
-            .createIceServer()
-    )
+
     private val peerConnection by lazy { createPeerConnection(observer) }
     private val localVideoSource by lazy { peerConnectionFactory.createVideoSource(false) }
     private val localAudioSource by lazy { peerConnectionFactory.createAudioSource(MediaConstraints()) }
@@ -104,6 +98,13 @@ class TriosRTCClient(
     }
 
     private fun createPeerConnection(observer: PeerConnection.Observer): PeerConnection? {
+        val iceServer = listOf(
+            PeerConnection.IceServer.builder(RTC_URL)
+                .setUsername(USERNAME)
+                .setPassword(PASSWORD)
+                .createIceServer()
+        )
+
         val rtcConfiguration = RTCConfiguration(iceServer).apply {
             iceTransportsType = PeerConnection.IceTransportsType.ALL
             bundlePolicy = PeerConnection.BundlePolicy.MAXCOMPAT
@@ -127,14 +128,21 @@ class TriosRTCClient(
 
     fun startLocalVideo(surface: SurfaceViewRenderer) {
         try {
-            val surfaceTextureHelper = SurfaceTextureHelper.create(Thread.currentThread().name, eglContext.eglBaseContext)
+            val surfaceTextureHelper =
+                SurfaceTextureHelper.create(Thread.currentThread().name, eglContext.eglBaseContext)
             videoCapturer = getVideoCapturer(application)
-            videoCapturer?.initialize(surfaceTextureHelper, surface.context, localVideoSource.capturerObserver)
+            videoCapturer?.initialize(
+                surfaceTextureHelper,
+                surface.context,
+                localVideoSource.capturerObserver
+            )
             videoCapturer?.startCapture(1920, 1080, 60)
 
-            localVideoTrack = peerConnectionFactory.createVideoTrack("local_track", localVideoSource)
+            localVideoTrack =
+                peerConnectionFactory.createVideoTrack("local_track", localVideoSource)
             localVideoTrack?.addSink(surface)
-            localAudioTrack = peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
+            localAudioTrack =
+                peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
 
             val localStream = peerConnectionFactory.createLocalMediaStream("local_stream")
             localStream.addTrack(localAudioTrack)
@@ -174,54 +182,51 @@ class TriosRTCClient(
         }
     }
 
-    fun call(target: String? = null) {
+    fun createOffer(target: String? = null) {
 
         val sdpObserverByCreate = object : SdpObserverImpl() {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                val sdpObserver = object : SdpObserver {
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
-                    override fun onSetSuccess() {
-
-                        val dataDto = DataDtoRequest(
-                            name = target,
-                            sdp = desc?.description
-                        )
-
-                        val rtcDto = RtcDtoRequest(
-                            type = "cmd",
-                            transId = 0,
-                            name = "join",
-                            dataDto = dataDto
-                        )
-
-                        // send socket cmd create offer
-                        socket.sendMessageToSocket(rtcDto)
-                    }
-
-                    override fun onCreateFailure(p0: String?) {}
-                    override fun onSetFailure(p0: String?) {}
-                }
-
-                peerConnection?.setLocalDescription(sdpObserver, desc)
+                setLocalDescAfterCreateOffer(target, desc)
             }
         }
 
         peerConnection?.createOffer(sdpObserverByCreate, mediaConstraints)
     }
 
+    private fun setLocalDescAfterCreateOffer(
+        target: String?,
+        spAfterCreateOffer: SessionDescription?
+    ) {
+        val sdpObserver = object : SdpObserverImpl() {
+            override fun onSetSuccess() {
+                val dataDto = DataDtoRequest(
+                    name = target,
+                    sdp = spAfterCreateOffer?.description
+                )
+
+                val rtcDto = RtcDtoRequest(
+                    type = "cmd",
+                    transId = 0,
+                    name = "join",
+                    dataDto = dataDto
+                )
+
+                // send socket cmd create offer
+                socket.sendMessageToSocket(rtcDto)
+            }
+        }
+
+        peerConnection?.setLocalDescription(sdpObserver, spAfterCreateOffer)
+    }
+
     fun setRemoteDesc(session: SessionDescription) {
         Log.d(TAG, "setRemoteDesc: 1")
-        val sdpObserver = object : SdpObserver {
-            override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onSetSuccess() {}
-            override fun onCreateFailure(p0: String?) {}
-            override fun onSetFailure(p0: String?) {}
-        }
+        val sdpObserver = object : SdpObserverImpl() {}
 
         peerConnection?.setRemoteDescription(sdpObserver, session)
     }
 
-    fun answer(target: String? = null, onSuccess: () -> Unit={}) {
+    fun createAnswer(target: String? = null, onSuccess: () -> Unit = {}) {
         val sdpObserver = object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
                 Log.d(TAG, "onCreateSuccess() called with: desc = $desc")
@@ -232,6 +237,7 @@ class TriosRTCClient(
             override fun onSetSuccess() {
                 Log.d(TAG, "onSetSuccess() called")
             }
+
             override fun onCreateFailure(p0: String?) {
                 Log.d(TAG, "onCreateFailure() called with: p0 = $p0")
             }

@@ -4,6 +4,7 @@ import android.util.Log
 import com.codewithkael.webrtcprojectforrecord.trios.model.base.RtcBaseResponse
 import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRequest
 import com.codewithkael.webrtcprojectforrecord.trios.model.call.response.RtcDtoResponse
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.update.RtcDtoUpdate
 import com.codewithkael.webrtcprojectforrecord.trios.model.event.response.EventDtoResponse
 import com.google.gson.Gson
 import org.java_websocket.client.WebSocketClient
@@ -31,6 +32,12 @@ class TriosSocket(private val listener: TriosSocketListener) {
                 Log.d(TAG, "onMessage raw data: $message")
                 val baseResponse = gson.fromJson(message, RtcBaseResponse::class.java)
                 when (baseResponse.type) {
+                    "cmd" -> {
+                        when (baseResponse.name) {
+                            "update" -> listener.onRtcUpdate(gson.fromJson(message, RtcDtoUpdate::class.java))
+                        }
+                    }
+
                     "response" -> listener.onRtcResponse(gson.fromJson(message, RtcDtoResponse::class.java))
                     "event" -> listener.onRtcEvent(gson.fromJson(message, EventDtoResponse::class.java))
                 }
