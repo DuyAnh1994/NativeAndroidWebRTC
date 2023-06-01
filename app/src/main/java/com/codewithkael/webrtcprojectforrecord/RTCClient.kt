@@ -33,17 +33,17 @@ class RTCClient(
     private val eglContext = EglBase.create()
     private val peerConnectionFactory by lazy { createPeerConnectionFactory() }
     private val iceServer = listOf(
-//        PeerConnection.IceServer.builder("stun:iphone-stun.strato-iphone.de:3478").createIceServer(),
-//        PeerConnection.IceServer("stun:openrelay.metered.ca:80"),
-//        PeerConnection.IceServer("turn:openrelay.metered.ca:80", "openrelayproject", "openrelayproject"),
-//        PeerConnection.IceServer("turn:openrelay.metered.ca:443", "openrelayproject", "openrelayproject"),
-//        PeerConnection.IceServer("turn:openrelay.metered.ca:443?transport=tcp", "openrelayproject", "openrelayproject"),
+        PeerConnection.IceServer.builder("stun:iphone-stun.strato-iphone.de:3478").createIceServer(),
+        PeerConnection.IceServer("stun:openrelay.metered.ca:80"),
+        PeerConnection.IceServer("turn:openrelay.metered.ca:80", "openrelayproject", "openrelayproject"),
+        PeerConnection.IceServer("turn:openrelay.metered.ca:443", "openrelayproject", "openrelayproject"),
+        PeerConnection.IceServer("turn:openrelay.metered.ca:443?transport=tcp", "openrelayproject", "openrelayproject"),
 
 
-        PeerConnection.IceServer.builder("turn:turn-dev01.gtrios.io:3478")
-            .setUsername("bgldemo")
-            .setPassword("bgltest")
-            .createIceServer()
+//        PeerConnection.IceServer.builder("turn:turn-dev01.gtrios.io:3478")
+//            .setUsername("bgldemo")
+//            .setPassword("bgltest")
+//            .createIceServer()
     )
     private val peerConnection by lazy { createPeerConnection(observer) }
     private val localVideoSource by lazy { peerConnectionFactory.createVideoSource(false) }
