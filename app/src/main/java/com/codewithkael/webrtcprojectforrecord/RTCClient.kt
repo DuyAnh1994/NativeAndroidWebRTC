@@ -33,8 +33,9 @@ class RTCClient(
     companion object {
         private const val TAG = "TriosRTCClient"
 
-        //        private const val RTC_URL = "turn:turn-dev01.gtrios.io:3478"
-        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
+        //        private const val RTC_URL = "turn:turn-dev01.gtrios.io:3478" // old version
+//        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478" // current testing
+        private const val RTC_URL = "stun:stun.l.google.com:19302" // test open source
         private const val USERNAME = "bgldemo"
         private const val PASSWORD = "bgltest"
     }
@@ -76,8 +77,8 @@ class RTCClient(
     private fun createPeerConnection(observer: PeerConnection.Observer): PeerConnection? {
         val iceServer = listOf(
             PeerConnection.IceServer.builder(RTC_URL)
-                .setUsername(USERNAME)
-                .setPassword(PASSWORD)
+//                .setUsername(USERNAME)
+//                .setPassword(PASSWORD)
                 .createIceServer()
         )
 

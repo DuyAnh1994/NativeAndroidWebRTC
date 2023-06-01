@@ -66,6 +66,8 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
             }
         })
         userName?.let { socketRepository?.initSocket(it) }
+
+
         rtcClient = RTCClient(
             application = application,
             username = userName!!,

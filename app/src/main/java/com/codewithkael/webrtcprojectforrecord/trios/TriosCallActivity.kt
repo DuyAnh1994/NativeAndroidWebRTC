@@ -5,7 +5,10 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.codewithkael.webrtcprojectforrecord.RTCClient
 import com.codewithkael.webrtcprojectforrecord.databinding.ActivityTriosCallBinding
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.DataDtoRequest
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRequest
 import com.codewithkael.webrtcprojectforrecord.trios.model.call.response.RtcDtoResponse
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.update.DataDtoUpdate
 import com.codewithkael.webrtcprojectforrecord.trios.model.call.update.RtcDtoUpdate
 import com.codewithkael.webrtcprojectforrecord.trios.model.event.response.EventDtoResponse
 import com.codewithkael.webrtcprojectforrecord.utils.PeerConnectionObserver
@@ -35,6 +38,7 @@ class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
         binding = ActivityTriosCallBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+//        val socketIO = TriosSocketIO()
         socketClient = TriosSocket(this)
         rtcClient = TriosRTCClient(
             application = application,
@@ -50,6 +54,7 @@ class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
 
     override fun onRtcResponse(rtcDto: RtcDtoResponse) {
         Log.d(TAG, "onRtcResponse() called with: rtcDto = ${rtcDto.type}")
+                offerResponse(rtcDto.dataDto?.sdp)
 
     }
 
@@ -59,7 +64,17 @@ class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
 
     override fun onRtcUpdate(rtcDto: RtcDtoUpdate) {
         Log.d(TAG, "onRtcUpdate() called with: eventDto = ${rtcDto.type}")
-        offerResponse(rtcDto.dataDto?.sdp)
+        update(rtcDto)
+    }
+
+    private fun update(rtcDto: RtcDtoUpdate) {
+        val dataDtoRequest = DataDtoRequest(sdp = rtcDto.dataDto?.sdp)
+        val request = RtcDtoRequest(
+            type = "response",
+            transId = 0,
+            dataDto = dataDtoRequest
+        )
+        socketClient?.sendMessageToSocket(request)
     }
 
     private fun callRequest() {
@@ -78,13 +93,16 @@ class TriosCallActivity : AppCompatActivity(), TriosSocketListener {
 
     private fun offerResponse(sdp: String?) {
         Log.d(TAG, "offerResponse: ccccccccc")
-//        runOnUiThread {
-//            val session = SessionDescription(SessionDescription.Type.OFFER, sdp)
-//            rtcClient?.setRemoteDesc(session)
+        runOnUiThread {
+            val session = SessionDescription(SessionDescription.Type.ANSWER, sdp)
+            rtcClient?.setRemoteDesc(session)
+
+
+
 //            rtcClient?.createAnswer() {
 //                hideLoading()
 //            }
-//        }
+        }
     }
 
     private fun answerResponse() {
