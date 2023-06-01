@@ -22,7 +22,11 @@ class TriosSocket(private val listener: TriosSocketListener) {
     private var webSocket: WebSocketClient? = null
     private val gson = Gson()
 
-    fun initSocket() {
+    init {
+        initSocket()
+    }
+
+    private fun initSocket() {
         webSocket = object : WebSocketClient(URI(WS_URL)) {
             override fun onOpen(handshakedata: ServerHandshake?) {
                 Log.d(TAG, "onOpen: connecting  httpStatus: ${handshakedata?.httpStatus}  httpMsg: ${handshakedata?.httpStatusMessage}")

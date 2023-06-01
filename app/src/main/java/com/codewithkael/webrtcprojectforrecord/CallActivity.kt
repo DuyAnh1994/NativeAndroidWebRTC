@@ -8,22 +8,30 @@ import androidx.appcompat.app.AppCompatActivity
 import com.codewithkael.webrtcprojectforrecord.databinding.ActivityCallBinding
 import com.codewithkael.webrtcprojectforrecord.models.IceCandidateModel
 import com.codewithkael.webrtcprojectforrecord.models.MessageModel
+import com.codewithkael.webrtcprojectforrecord.trios.TriosSocket
+import com.codewithkael.webrtcprojectforrecord.trios.TriosSocketListener
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.response.RtcDtoResponse
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.update.RtcDtoUpdate
+import com.codewithkael.webrtcprojectforrecord.trios.model.event.response.EventDtoResponse
 import com.codewithkael.webrtcprojectforrecord.utils.NewMessageInterface
 import com.codewithkael.webrtcprojectforrecord.utils.PeerConnectionObserver
 import com.codewithkael.webrtcprojectforrecord.utils.RTCAudioManager
 import com.google.gson.Gson
+import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
+import org.webrtc.RtpReceiver
 import org.webrtc.SessionDescription
 
 class CallActivity : AppCompatActivity(), NewMessageInterface {
 
-
+    private val TAG = "CallActivity"
     lateinit var binding: ActivityCallBinding
     private var userName: String? = null
     private var socketRepository: SocketRepository? = null
+    private var socket: TriosSocket? = null
     private var rtcClient: RTCClient? = null
-    private val TAG = "CallActivity"
     private var target: String = ""
     private val gson = Gson()
     private var isMute = false
@@ -44,39 +52,49 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
     private fun init() {
         userName = intent.getStringExtra("username")
         socketRepository = SocketRepository(this)
-        userName?.let { socketRepository?.initSocket(it) }
-        rtcClient = RTCClient(application, userName!!, socketRepository!!, object : PeerConnectionObserver() {
-            override fun onIceCandidate(p0: IceCandidate?) {
-                super.onIceCandidate(p0)
-                rtcClient?.addIceCandidate(p0)
-                val candidate = hashMapOf(
-                    "sdpMid" to p0?.sdpMid,
-                    "sdpMLineIndex" to p0?.sdpMLineIndex,
-                    "sdpCandidate" to p0?.sdp
-                )
-
-                socketRepository?.sendMessageToSocket(
-                    MessageModel("ice_candidate", userName, target, candidate)
-                )
-
+        socket = TriosSocket(object : TriosSocketListener {
+            override fun onRtcResponse(rtcDto: RtcDtoResponse) {
+                Log.d(TAG, "onRtcResponse: ")
             }
 
-            override fun onAddStream(p0: MediaStream?) {
-                super.onAddStream(p0)
-                p0?.videoTracks?.get(0)?.addSink(binding.remoteView)
-                Log.d(TAG, "onAddStream: $p0")
+            override fun onRtcEvent(eventDto: EventDtoResponse) {
+                Log.d(TAG, "onRtcEvent: ")
+            }
 
+            override fun onRtcUpdate(rtcDto: RtcDtoUpdate) {
+                Log.d(TAG, "onRtcUpdate: ")
             }
         })
+        userName?.let { socketRepository?.initSocket(it) }
+        rtcClient = RTCClient(
+            application = application,
+            username = userName!!,
+            socketRepository = socketRepository!!,
+            socket = socket!!,
+            observer = peerConnectionObserverImpl
+        )
         rtcAudioManager.setDefaultAudioDevice(RTCAudioManager.AudioDevice.SPEAKER_PHONE)
 
 
         binding.apply {
             callBtn.setOnClickListener {
-                socketRepository?.sendMessageToSocket(MessageModel(
-                    "start_call", userName, targetUserNameEt.text.toString(), null
-                ))
-                target = targetUserNameEt.text.toString()
+//                socketRepository?.sendMessageToSocket(MessageModel(
+//                    "start_call", userName, targetUserNameEt.text.toString(), null
+//                ))
+//                target = targetUserNameEt.text.toString()
+
+
+                //we are ready for call, we started a call
+                runOnUiThread {
+                    setWhoToCallLayoutGone()
+                    setCallLayoutVisible()
+                    binding.apply {
+                        rtcClient?.initializeSurfaceView(localView)
+                        rtcClient?.initializeSurfaceView(remoteView)
+                        rtcClient?.startLocalVideo(localView)
+                        rtcClient?.call(targetUserNameEt.text.toString())
+                    }
+                }
             }
 
             switchCameraButton.setOnClickListener {
@@ -228,5 +246,64 @@ class CallActivity : AppCompatActivity(), NewMessageInterface {
 
     private fun setWhoToCallLayoutVisible() {
         binding.whoToCallLayout.visibility = View.VISIBLE
+    }
+
+    private val peerConnectionObserverImpl = object : PeerConnectionObserver() {
+        override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
+            Log.d(TAG, "onSignalingChange() called with: p0 = ${p0?.name}")
+        }
+
+        override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
+            Log.d(TAG, "onIceConnectionChange() called with: p0 = ${p0?.name}")
+        }
+
+        override fun onIceConnectionReceivingChange(p0: Boolean) {
+            Log.d(TAG, "onIceConnectionReceivingChange() called with: p0 = $p0")
+        }
+
+        override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {
+            Log.d(TAG, "onIceGatheringChange() called with: p0 = ${p0?.name}")
+        }
+
+        override fun onIceCandidate(p0: IceCandidate?) {
+//            Log.d(TAG, "onIceCandidate() called with: p0 = $p0")
+
+            rtcClient?.addIceCandidate(p0)
+
+//                val candidate = hashMapOf(
+//                    "sdpMid" to p0?.sdpMid,
+//                    "sdpMLineIndex" to p0?.sdpMLineIndex,
+//                    "sdpCandidate" to p0?.sdp
+//                )
+
+//                socketRepository?.sendMessageToSocket(
+//                    MessageModel("ice_candidate", userName, target, candidate)
+//                )
+        }
+
+        override fun onIceCandidatesRemoved(p0: Array<out IceCandidate>?) {
+            Log.d(TAG, "onIceCandidatesRemoved() called with: p0 = ${p0?.count()}")
+        }
+
+        override fun onAddStream(p0: MediaStream?) {
+            Log.d(TAG, "onAddStream() called with: p0 = ${p0?.id}")
+            p0?.videoTracks?.get(0)?.addSink(binding.remoteView)
+        }
+
+        override fun onRemoveStream(p0: MediaStream?) {
+            Log.d(TAG, "onRemoveStream() called with: p0 = ${p0?.id}")
+        }
+
+        override fun onDataChannel(p0: DataChannel?) {
+            Log.d(TAG, "onDataChannel() called with: p0 = $p0")
+        }
+
+        override fun onRenegotiationNeeded() {
+            Log.d(TAG, "onRenegotiationNeeded() called")
+        }
+
+        override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {
+            Log.d(TAG, "onAddTrack() called with: p0 = $p0, p1 = ${p1?.count()}")
+        }
     }
 }

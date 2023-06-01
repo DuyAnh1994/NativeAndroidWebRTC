@@ -1,7 +1,10 @@
 package com.codewithkael.webrtcprojectforrecord
 
 import android.app.Application
-import com.codewithkael.webrtcprojectforrecord.models.MessageModel
+import com.codewithkael.webrtcprojectforrecord.trios.SdpObserverImpl
+import com.codewithkael.webrtcprojectforrecord.trios.TriosSocket
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.DataDtoRequest
+import com.codewithkael.webrtcprojectforrecord.trios.model.call.request.RtcDtoRequest
 import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
 import org.webrtc.CameraVideoCapturer
@@ -10,6 +13,7 @@ import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
+import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.SdpObserver
@@ -22,8 +26,18 @@ class RTCClient(
     private val application: Application,
     private val username: String,
     private val socketRepository: SocketRepository,
+    private val socket: TriosSocket,
     private val observer: PeerConnection.Observer
 ) {
+
+    companion object {
+        private const val TAG = "TriosRTCClient"
+
+        //        private const val RTC_URL = "turn:turn-dev01.gtrios.io:3478"
+        private const val RTC_URL = "turn:dev.turn2.gtrios.io:3478"
+        private const val USERNAME = "bgldemo"
+        private const val PASSWORD = "bgltest"
+    }
 
     init {
         initPeerConnectionFactory(application)
@@ -32,19 +46,6 @@ class RTCClient(
 
     private val eglContext = EglBase.create()
     private val peerConnectionFactory by lazy { createPeerConnectionFactory() }
-    private val iceServer = listOf(
-        PeerConnection.IceServer.builder("stun:iphone-stun.strato-iphone.de:3478").createIceServer(),
-        PeerConnection.IceServer("stun:openrelay.metered.ca:80"),
-        PeerConnection.IceServer("turn:openrelay.metered.ca:80", "openrelayproject", "openrelayproject"),
-        PeerConnection.IceServer("turn:openrelay.metered.ca:443", "openrelayproject", "openrelayproject"),
-        PeerConnection.IceServer("turn:openrelay.metered.ca:443?transport=tcp", "openrelayproject", "openrelayproject"),
-
-
-//        PeerConnection.IceServer.builder("turn:turn-dev01.gtrios.io:3478")
-//            .setUsername("bgldemo")
-//            .setPassword("bgltest")
-//            .createIceServer()
-    )
     private val peerConnection by lazy { createPeerConnection(observer) }
     private val localVideoSource by lazy { peerConnectionFactory.createVideoSource(false) }
     private val localAudioSource by lazy { peerConnectionFactory.createAudioSource(MediaConstraints()) }
@@ -73,7 +74,33 @@ class RTCClient(
     }
 
     private fun createPeerConnection(observer: PeerConnection.Observer): PeerConnection? {
-        return peerConnectionFactory.createPeerConnection(iceServer, observer)
+        val iceServer = listOf(
+            PeerConnection.IceServer.builder(RTC_URL)
+                .setUsername(USERNAME)
+                .setPassword(PASSWORD)
+                .createIceServer()
+        )
+
+        val pc = peerConnectionFactory.createPeerConnection(iceServer, observer)
+
+        val rtcConfiguration = PeerConnection.RTCConfiguration(iceServer).apply {
+//            iceTransportsType = PeerConnection.IceTransportsType.ALL
+//            bundlePolicy = PeerConnection.BundlePolicy.MAXCOMPAT
+//            disableIpv6 = true
+//            disableIPv6OnWifi = true
+
+            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+//            iceBackupCandidatePairPingInterval = 1000
+//            candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
+        }
+
+
+        pc?.setConfiguration(rtcConfiguration)
+
+
+//        val pc = peerConnectionFactory.createPeerConnection(rtcConfiguration, observer)
+
+        return pc
     }
 
     fun initializeSurfaceView(surface: SurfaceViewRenderer) {
@@ -115,27 +142,34 @@ class RTCClient(
         val mediaConstraints = MediaConstraints()
         mediaConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
 
-        peerConnection?.createOffer(object : SdpObserver {
+        peerConnection?.createOffer(object : SdpObserverImpl() {
             override fun onCreateSuccess(desc: SessionDescription?) {
                 setLocalDesc(desc, target)
             }
-
-            override fun onSetSuccess() {}
-            override fun onCreateFailure(p0: String?) {}
-            override fun onSetFailure(p0: String?) {}
         }, mediaConstraints)
     }
 
     fun setLocalDesc(desc: SessionDescription?, target: String) {
-        peerConnection?.setLocalDescription(object : SdpObserver {
-            override fun onCreateSuccess(p0: SessionDescription?) {}
+        peerConnection?.setLocalDescription(object : SdpObserverImpl() {
             override fun onSetSuccess() {
-                val offer = hashMapOf("sdp" to desc?.description, "type" to desc?.type)
-                socketRepository.sendMessageToSocket(MessageModel("create_offer", username, target, offer))
-            }
+//                val offer = hashMapOf("sdp" to desc?.description, "type" to desc?.type)
+//                socketRepository.sendMessageToSocket(MessageModel("create_offer", username, target, offer))
 
-            override fun onCreateFailure(p0: String?) {}
-            override fun onSetFailure(p0: String?) {}
+                val dataDto = DataDtoRequest(
+                    name = target,
+                    sdp = desc?.description
+                )
+
+                val rtcDto = RtcDtoRequest(
+                    type = "cmd",
+                    transId = 0,
+                    name = "join",
+                    dataDto = dataDto
+                )
+
+                // send socket cmd create offer and sdp offer
+                socket.sendMessageToSocket(rtcDto)
+            }
         }, desc)
     }
 
@@ -152,23 +186,15 @@ class RTCClient(
         val constraints = MediaConstraints()
         constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
 
-        peerConnection?.createAnswer(object : SdpObserver {
+        peerConnection?.createAnswer(object : SdpObserverImpl() {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                peerConnection?.setLocalDescription(object : SdpObserver {
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
+                peerConnection?.setLocalDescription(object : SdpObserverImpl() {
                     override fun onSetSuccess() {
-                        val answer = hashMapOf("sdp" to desc?.description, "type" to desc?.type)
-                        socketRepository.sendMessageToSocket(MessageModel("create_answer", username, target, answer))
+//                        val answer = hashMapOf("sdp" to desc?.description, "type" to desc?.type)
+//                        socketRepository.sendMessageToSocket(MessageModel("create_answer", username, target, answer))
                     }
-
-                    override fun onCreateFailure(p0: String?) {}
-                    override fun onSetFailure(p0: String?) {}
                 }, desc)
             }
-
-            override fun onSetSuccess() {}
-            override fun onCreateFailure(p0: String?) {}
-            override fun onSetFailure(p0: String?) {}
         }, constraints)
     }
 

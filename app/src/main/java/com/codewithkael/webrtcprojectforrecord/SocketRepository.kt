@@ -21,24 +21,24 @@ class SocketRepository (private val messageInterface: NewMessageInterface) {
         // and get your ethernet ipv4 , mine is : "ws://192.168.1.3:3000"
         //but if your websocket is deployed you add your websocket address here
 
-        //        val wsUrl = "wss://dev.turn2.gtrios.io:8084?id=bGlobal"
-        val wsUrl = "ws://10.0.2.2:3000"
+                val wsUrl = "wss://dev.turn2.gtrios.io:8084?id=bGlobal"
+//        val wsUrl = "ws://10.0.2.2:3000"
 //        val wsUrl = "ws://192.168.1.55:3000"
 
         webSocket = object : WebSocketClient(URI(wsUrl)) {
             //        webSocket = object : WebSocketClient(URI("ws://192.168.1.3:3000")) {
             override fun onOpen(handshakedata: ServerHandshake?) {
-                sendMessageToSocket(
-                    MessageModel(
-                        "store_user",username,null,null
-                    )
-                )
+//                sendMessageToSocket(
+//                    MessageModel(
+//                        "store_user",username,null,null
+//                    )
+//                )
             }
 
             override fun onMessage(message: String?) {
                 try {
                     Log.d(TAG, "receiver json: $message")
-                    messageInterface.onNewMessage(gson.fromJson(message,MessageModel::class.java))
+//                    messageInterface.onNewMessage(gson.fromJson(message,MessageModel::class.java))
 
                 }catch (e:Exception){
                     e.printStackTrace()
